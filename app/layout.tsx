@@ -4,6 +4,8 @@ import { PROJECTS } from "@/lib/projects";
 import { Inter } from "next/font/google";
 import Nav from "@/components/Nav";
 import KeyGate from "@/components/KeyGate";
+import UpdateBanner from "@/components/UpdateBanner";
+import { DriveAutoSave } from "@/components/DriveSync";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
@@ -17,9 +19,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
+        <UpdateBanner />
         <Nav />
         <KeyGate>{children}</KeyGate>
         <DialogHost />
+        <DriveAutoSave />
         <footer className="mt-auto py-4 text-center text-xs text-muted">
           {process.env.NEXT_PUBLIC_SUPPORT_EMAIL && (
             <>

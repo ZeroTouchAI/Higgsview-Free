@@ -14,7 +14,7 @@ const KIE: [string, string, string][] = [
 const Icon = ({ d }: { d: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="size-[18px] shrink-0 text-fg/70"><path d={d} /></svg>
 );
-const VERSION = "1.1"; // shown in the account menu (also package.json)
+export const VERSION = "2.34"; // bump on EVERY change (also package.json; UpdateBanner compares the two). Same number as the private Higgsview repo.
 // Help & feedback: opens a Gmail draft (everyone signs in with Google) to NEXT_PUBLIC_SUPPORT_EMAIL, with the
 // account email and version filled in so replies are easy. Hidden when no support email is configured.
 export const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "";

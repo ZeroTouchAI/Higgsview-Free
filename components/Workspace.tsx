@@ -7,6 +7,8 @@ import { MODELS, PRESETS, byId, defaultRes, estimateUsd, type Mode, type Model }
 import { refreshHistory, useHistory, type Item } from "@/lib/history";
 import Feed from "@/components/Feed";
 import { Chip, Upload } from "@/components/Controls";
+import { scriptsOf } from "@/lib/scripts";
+import { askDriveSave } from "@/components/DriveSync";
 
 const TABS: [Mode, string][] = [["create", "Create"], ["edit", "Edit"], ["motion", "Motion Control"], ["swap", "Genjutsu"]];
 // "16:9"-style option nearest to a width/height ratio.
@@ -54,6 +56,7 @@ export default function Workspace({ kind }: { kind: "video" | "image" | "audio" 
   const [error, setError] = useState("");
   const [picker, setPicker] = useState(false);
   const [presets, setPresets] = useState(sp.get("presets") === "1");
+  const [oldPrompts, setOldPrompts] = useState(false);
   const items = useHistory();
 
   const unified = (model.mode === "create" || model.mode === "image") && (model.frames !== "none" || !!model.refs);
@@ -72,7 +75,8 @@ export default function Workspace({ kind }: { kind: "video" | "image" | "audio" 
       // 30s = two separate 15s jobs: the second part can't see the first, so details (e.g. clothes) can change.
       if (!(await ask({ title: "30 seconds = 2 parts", cost, confirm: `I understand · Pay ≈ $${cost.toFixed(2)}`, tone: "pay",
         message: "Kling can only make 15 seconds at a time, so your video is made as two 15-second parts. Part 2 starts after part 1 and gets a still from its last moment, but it can't see everything: things that weren't visible (like someone's pants or shoes) may look different in part 2.\n\nWhen both are done, press “Join both parts into one video”." }))) return;
-    } else if (cost > 2 && !(await askToPay(cost))) return;
+    } else if (cost > 0 && !(await askToPay(cost))) return;
+    await askDriveSave(model.output === "text" ? "text" : kind);
     setError("");
     setBusy(true);
     // With reference images, tell the video model to keep them faithful (brand colors and logos were drifting).
@@ -203,7 +207,11 @@ export default function Workspace({ kind }: { kind: "video" | "image" | "audio" 
 
         {/* Prompt */}
         <label className="flex flex-col gap-1 rounded-xl bg-chip p-3">
-          <span className="text-xs font-semibold text-muted">Prompt{model.promptOptional && " (optional)"}</span>
+          <span className="flex items-center text-xs font-semibold text-muted">
+            Prompt{model.promptOptional && " (optional)"}
+            <button type="button" onClick={(e) => { e.preventDefault(); setOldPrompts(true); }} title="Pick one of your earlier prompts"
+              className="ml-auto rounded-md bg-line px-2 py-0.5 text-[11px] font-semibold text-fg hover:bg-white/20">🕘 Old prompts</button>
+          </span>
           <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4}
             placeholder={
               extendFrom ? "What happens next? e.g. “The camera pulls back to reveal the whole city”"
@@ -275,6 +283,7 @@ export default function Workspace({ kind }: { kind: "video" | "image" | "audio" 
           onExtend={kind === "video" ? (i) => { setExtendFrom(i); setPrompt(""); } : undefined} />
       </main>
 
+      {oldPrompts && <PromptPicker onPick={(t) => { setPrompt(t); setOldPrompts(false); }} onClose={() => setOldPrompts(false)} />}
       {presets && <PresetModal onPick={(p) => { setPreset(p); setPresets(false); }} onClose={() => setPresets(false)} />}
     </div>
   );
@@ -319,6 +328,47 @@ function ImagesArea({ images, setImages, max, videos, setVideos, maxVideos, hint
           Start the video exactly from image 1 (first-frame mode, no references)
         </label>
       )}
+    </div>
+  );
+}
+
+// Your earlier prompts (every distinct one, newest first; kept after videos expire). One line each: hover to
+// read the whole prompt below the list, click to put it in the prompt box.
+function PromptPicker({ onPick, onClose }: { onPick: (text: string) => void; onClose: () => void }) {
+  const scripts = scriptsOf(useHistory(true));
+  const [q, setQ] = useState("");
+  const [hover, setHover] = useState<string>();
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = words.length ? scripts.filter((s) => words.every((w) => s.text.toLowerCase().includes(w))) : scripts;
+  const preview = hover ?? shown[0]?.text;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose} onKeyDown={(e) => e.key === "Escape" && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label="Old prompts" onClick={(e) => e.stopPropagation()} className="flex max-h-[85vh] w-full max-w-2xl flex-col gap-3 rounded-2xl border border-white/10 bg-[#1b1c1e] p-4 shadow-2xl">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-black uppercase">Old prompts <span className="ml-1 rounded-md bg-chip px-1.5 text-xs text-muted">{scripts.length}</span></h2>
+          <input autoFocus type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" aria-label="Search old prompts"
+            className="ml-auto min-w-0 flex-1 rounded-xl bg-chip px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-lime sm:max-w-xs" />
+          <button onClick={onClose} aria-label="Close" className="rounded-lg bg-chip px-2.5 py-1.5 text-sm hover:bg-line">✕</button>
+        </div>
+        <ul className="flex max-h-[185px] shrink-0 flex-col overflow-y-scroll rounded-xl bg-white/[.03]" /* 5 rows visible (37px each), the rest scrolls */ onMouseLeave={() => setHover(undefined)}>
+          {shown.map((s) => (
+            <li key={s.text}>
+              <button onClick={() => onPick(s.text)} onMouseEnter={() => setHover(s.text)} onFocus={() => setHover(s.text)} title={s.text}
+                className="flex w-full items-center gap-3 border-b border-white/5 px-3 py-2 text-left text-sm hover:bg-lime/10 focus:bg-lime/10 focus:outline-none">
+                <span className="min-w-0 flex-1 truncate text-fg/90">{s.text.replace(/\s+/g, " ")}</span>
+                <span className="shrink-0 text-[11px] text-muted">{s.model} · {new Date(s.at).toLocaleDateString()}</span>
+              </button>
+            </li>
+          ))}
+          {!shown.length && <li className="p-3 text-sm text-muted">{scripts.length ? "Nothing matches." : "Your prompts will show up here after your first generation."}</li>}
+        </ul>
+        {preview && (
+          <div className="h-40 shrink-0 overflow-y-auto rounded-xl bg-chip p-3 text-xs whitespace-pre-wrap text-fg/80">
+            <span className="mb-1 block text-[10px] font-semibold tracking-wide text-muted uppercase">Full prompt · click a line to use it</span>
+            {preview}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

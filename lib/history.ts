@@ -18,6 +18,7 @@ export type Item = {
   usd?: number;
   driveLink?: string; // set after "Export to Drive"
   driveFolder?: { link: string; name: string }; // the Drive folder it was saved in
+  thumb?: string; // small JPEG data URL (≈5–10 KB), saved with Drive copies so the card still shows a picture after Kie deletes the file
   app?: { id: string; input: AppInput; step: number; notes?: string }; // multi-step App progress (notes = text from earlier steps)
   text?: string; // text result (analysis, storyboard, transcript)
   group?: string; // items made together (script scenes, long-video parts); Feed offers "Join"

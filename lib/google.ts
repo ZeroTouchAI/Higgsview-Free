@@ -25,7 +25,25 @@ export const loadGoogle = () => (loading ??= new Promise<Google>((ok, fail) => {
 }));
 
 // Access token for the user's own Google Drive, limited to files Higgsview creates (drive.file). Cached ~1h.
-let drive: { token: string; until: number } | undefined;
+// Kept in sessionStorage so a page reload doesn't drop the connection while Google's permission is still valid.
+type Token = { token: string; until: number };
+const TOKEN = "hv_drive_token";
+let drive: Token | undefined = (() => { try { const t = JSON.parse(sessionStorage.getItem(TOKEN) ?? "null") as Token | null; return t && Date.now() < t.until ? t : undefined; } catch { return undefined; } })();
+const changed = () => { if (typeof window !== "undefined") dispatchEvent(new Event("hv_drive")); };
+function setDrive(t?: Token) {
+  drive = t;
+  try { if (t) sessionStorage.setItem(TOKEN, JSON.stringify(t)); else sessionStorage.removeItem(TOKEN); } catch {}
+  changed();
+}
+export const driveConnected = () => !!drive && Date.now() < drive.until;
+export const driveMinutesLeft = () => (drive ? Math.max(0, Math.round((drive.until - Date.now()) / 60_000)) : 0);
+export const onDriveChange = (cb: () => void) => { addEventListener("hv_drive", cb); return () => removeEventListener("hv_drive", cb); };
+
+// "Save every new result to Drive" (per browser). `since` = when it was switched on: older results aren't swept up.
+const AUTO = "hv_drive_auto";
+export const autoSave = (): { on?: boolean; since?: number } => { try { return JSON.parse(localStorage.getItem(AUTO) ?? "{}"); } catch { return {}; } };
+export const setAutoSave = (on: boolean) => { try { localStorage.setItem(AUTO, JSON.stringify(on ? { on, since: Date.now() } : {})); } catch {} changed(); };
+
 export async function driveToken(): Promise<string> {
   if (drive && Date.now() < drive.until) return drive.token;
   const g = await loadGoogle();
@@ -34,7 +52,7 @@ export async function driveToken(): Promise<string> {
       client_id: GOOGLE_CLIENT_ID, scope: "https://www.googleapis.com/auth/drive.file",
       callback: (r) => {
         if (!r.access_token) return fail(new Error(r.error ?? "Google Drive access was not granted"));
-        drive = { token: r.access_token, until: Date.now() + ((r.expires_in ?? 3600) - 60) * 1000 };
+        setDrive({ token: r.access_token, until: Date.now() + ((r.expires_in ?? 3600) - 60) * 1000 });
         ok(r.access_token);
       },
       error_callback: (e) => fail(new Error(e.message ?? "Google Drive access was cancelled")),
@@ -103,7 +121,7 @@ export async function saveToDrive(file: string | Blob, name: string): Promise<{ 
   const auth = { Authorization: `Bearer ${await driveToken()}` };
   const api = "https://www.googleapis.com/drive/v3/files";
   // Google answers 401 when the hour-long Drive permission has lapsed: forget it so the next click asks again.
-  const check = (r: Response) => { if (r.status === 401) { drive = undefined; throw new Stop("Google Drive access expired. Press the button again to reconnect."); } return r; };
+  const check = (r: Response) => { if (r.status === 401) { setDrive(undefined); throw new Stop("Google Drive access expired. Press the button again to reconnect."); } return r; };
   let target = savedFolder();
   if (!target) {
     const id = await attempt("Couldn't reach Google Drive", async () => {

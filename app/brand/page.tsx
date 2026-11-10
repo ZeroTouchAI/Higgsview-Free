@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { refreshHistory, useHistory, type Item } from "@/lib/history";
-import { recordClips } from "@/components/Controls";
+import { makeThumb, recordClips } from "@/components/Controls";
 import { driveToken, saveToDrive } from "@/lib/google";
 import { kieBlob } from "@/lib/kieFile";
 import { tell } from "@/components/Dialog";
@@ -111,7 +111,7 @@ function Brand() {
       if (!saved) { setStatus(""); return; }
       const out: Item = {
         id, kind: "video", modelId: "brand", modelName: "Video + text", prompt: `“${o.title}”${o.sub ? ` · ${o.sub}` : ""} on: ${item!.prompt.slice(0, 120)}`,
-        driveLink: saved.link, driveFolder: { link: saved.folder, name: saved.folderName }, state: "success", usd: 0, createdAt,
+        driveLink: saved.link, driveFolder: { link: saved.folder, name: saved.folderName }, thumb: await makeThumb(blob), state: "success", usd: 0, createdAt,
       };
       await fetch("/api/history", { method: "POST", body: JSON.stringify([out]) });
       await refreshHistory();

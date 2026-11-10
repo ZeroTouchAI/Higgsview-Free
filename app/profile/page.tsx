@@ -3,6 +3,7 @@ import { useEffect, useReducer, useState, useSyncExternalStore } from "react";
 import type { Profile } from "@/lib/auth";
 import { initialsOf } from "@/components/AccountMenu";
 import { ConnectKie, getKey, setKey } from "@/components/KeyGate";
+import { DriveConnection } from "@/components/DriveSync";
 import { canPickFolder, driveFolderUrl, folderLink, pickFolder, savedFolder, setSavedFolder } from "@/lib/google";
 
 const FIELDS: [keyof Profile, string, string][] = [["firstName", "First name", "given-name"], ["lastName", "Last name", "family-name"]];
@@ -55,7 +56,8 @@ export default function ProfilePage() {
       </form>
 
       <section id="drive" className="flex flex-col gap-3 rounded-2xl bg-panel p-4">
-        <h2 className="font-black uppercase">Google Drive folder</h2>
+        <h2 className="font-black uppercase">Google Drive</h2>
+        <DriveConnection />
         <p className="text-sm text-muted">
           The ▲ Google Drive button saves to{" "}
           {folder ? <a href={folderLink(JSON.parse(folder).id)} target="_blank" rel="noreferrer" className="font-semibold text-fg underline">{JSON.parse(folder).name}</a>
@@ -80,6 +82,7 @@ export default function ProfilePage() {
         </div>
         {changing && <ConnectKie onDone={() => { refresh(); setChanging(false); }} />}
       </section>
+
     </div>
   );
 }

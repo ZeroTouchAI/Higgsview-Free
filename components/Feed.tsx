@@ -2,8 +2,9 @@
 import { ask, askToPay, tell } from "@/components/Dialog";
 import { useEffect, useState } from "react";
 import { lastFrame, uploadFile } from "@/components/Controls";
-import { loadGoogle, saveToDrive, savedFolder } from "@/lib/google";
+import { loadGoogle, savedFolder } from "@/lib/google";
 import { kieBlob } from "@/lib/kieFile";
+import { askDriveSave, saveItemToDrive, useDrive } from "@/components/DriveSync";
 import { msLeft, refreshHistory, removeItem, unavailable, type Item } from "@/lib/history";
 import Link from "next/link";
 import { appById, appCost, stepsOf } from "@/lib/apps";
@@ -49,11 +50,12 @@ export default function Feed({ items, kind, onReuse, onContinue, onExtend }: { i
                 </button>
               )
             ) : i.state === "success" && i.driveLink ? (
-              <div className="flex flex-col items-center gap-3 p-4 text-center text-sm text-muted">
-                <span className="text-3xl">▲</span>
-                Saved in your Google Drive{i.driveFolder ? ` (${i.driveFolder.name})` : ""}
-                <a href={i.driveLink} target="_blank" rel="noreferrer" className={`${ACTION} ${BLUE}`}>↗ Open in Drive</a>
-              </div>
+              <a href={i.driveLink} target="_blank" rel="noreferrer" title="Open in Google Drive" className="group absolute inset-0 grid place-items-center">
+                {i.thumb
+                  ? <img src={i.thumb} alt={i.prompt} className="size-full object-contain opacity-90 group-hover:opacity-100" />
+                  : <span className="text-sm text-muted">▲ Saved in your Google Drive</span>}
+                <span className="absolute right-2 bottom-2 rounded-md bg-black/70 px-2 py-1 text-[11px] font-semibold text-white">▲ In Drive{i.kind === "video" ? " · play there" : ""}</span>
+              </a>
             ) : i.state === "pending" ? (
               <div className="flex flex-col items-center gap-2 text-sm text-muted">
                 <span className="size-8 animate-spin rounded-full border-2 border-line border-t-lime" />
@@ -175,6 +177,7 @@ function RegenButton({ item }: { item: Item }) {
   async function regen() {
     // Regenerating is a new paid job: always say what it costs and ask first (free jobs skip the question).
     if (cost > 0 && !(await askToPay(cost, "Regenerating this"))) return;
+    await askDriveSave(item.kind);
     setBusy(true);
     const body = item.app ? { appId: item.app.id, input: item.app.input } : { modelId: item.modelId, params: item.params };
     const d = await fetch("/api/generate", { method: "POST", body: JSON.stringify(body) }).then((r) => r.json()).catch((e) => ({ error: String(e) }));
@@ -231,12 +234,13 @@ async function markIfGone(i: Item) {
 
 // Countdown until Kie deletes the file (~14 days). Hidden once it's saved to Google Drive.
 function Expiry({ i }: { i: Item }) {
+  const { connected, auto } = useDrive();
   const ms = msLeft(i);
-  if (ms === Infinity || i.driveLink || i.state !== "success") return null;
+  // Hidden when it's already in Drive, or auto-save is on and connected (it's about to be saved).
+  if (ms === Infinity || i.driveLink || i.state !== "success" || (auto.on && connected && i.createdAt >= (auto.since ?? 0))) return null;
   const h = ms / 36e5;
   const label = h >= 48 ? `${Math.floor(h / 24)} days left` : h >= 1 ? `${Math.floor(h)}h left` : "< 1h left";
-  const tone = h < 24 ? "bg-red-500/20 text-red-300" : h < 72 ? "bg-amber-500/20 text-amber-300" : "bg-chip";
-  return <span title="Kie.ai deletes results after about 14 days. Download it or save it to Google Drive to keep it." className={`rounded px-1.5 py-0.5 ${tone}`}>⏳ {label}</span>;
+  return <span title="Kie.ai deletes results after about 14 days. Download it or save it to Google Drive to keep it." className="rounded bg-amber-500/15 px-1.5 py-0.5 font-semibold text-amber-300">⏳ {label}</span>;
 }
 
 function DriveButton({ item }: { item: Item }) {
@@ -253,10 +257,7 @@ function DriveButton({ item }: { item: Item }) {
   async function exportIt() {
     setState("busy");
     try {
-      const ext = item.kind === "video" ? "mp4" : item.kind === "audio" ? "mp3" : "png";
-      const saved = await saveToDrive(item.url!, `higgsview-${item.modelId}-${new Date(item.createdAt).toISOString().slice(0, 19).replace(/:/g, "-")}.${ext}`);
-      await fetch("/api/export", { method: "POST", body: JSON.stringify({ id: item.id, link: saved.link, folder: saved.folder, folderName: saved.folderName }) });
-      await refreshHistory();
+      await saveItemToDrive(item);
     } catch (e) {
       setErr((e as Error).message);
       setState("error");

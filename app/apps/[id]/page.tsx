@@ -1,5 +1,6 @@
 "use client";
 import { askToPay } from "@/components/Dialog";
+import { askDriveSave } from "@/components/DriveSync";
 import Link from "next/link";
 import { use, useState } from "react";
 import { APPS, appById, appCost, stepsOf, type AppInput, type Tier } from "@/lib/apps";
@@ -33,7 +34,8 @@ export default function AppPage({ params }: PageProps<"/apps/[id]">) {
     && (app.inputs.length > 0 || !app.optional || app.optional.some(([k]) => input[k]) || !!input.text?.trim());
 
   async function run() {
-    if (cost > 2 && !(await askToPay(cost))) return;
+    if (cost > 0 && !(await askToPay(cost))) return;
+    await askDriveSave(app?.out ?? "video");
     setBusy(true); setError("");
     try {
       const d = await fetch("/api/generate", { method: "POST", body: JSON.stringify({ appId: id, input: { ...input, choice } }) }).then((r) => r.json());
