@@ -1,5 +1,6 @@
 "use client";
 import { askToPay } from "@/components/Dialog";
+import { askDriveSave } from "@/components/DriveSync";
 import { useState } from "react";
 import { byId, defaultRes, estimateUsd } from "@/lib/models";
 import { refreshHistory, useHistory } from "@/lib/history";
@@ -64,7 +65,8 @@ export default function CinemaStudio() {
   ].filter(Boolean).join(" ");
 
   async function generate() {
-    if (cost > 2 && !(await askToPay(cost))) return;
+    if (cost > 0 && !(await askToPay(cost))) return;
+    await askDriveSave(mode === "video" ? "video" : "image");
     setBusy(true); setError("");
     try {
       const params = { prompt: fullPrompt, duration, aspect: aspectV, resolution, audio: true, start };

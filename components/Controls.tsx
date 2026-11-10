@@ -95,6 +95,30 @@ export async function lastFrame(url: string): Promise<File> {
   return new File([blob], `frame-${Date.now()}.jpg`, { type: "image/jpeg" });
 }
 
+// A small still (240 px wide JPEG as a data URL) of a video or image, kept with the History item.
+// ponytail: stored inline in history.json (≈5–10 KB each, only for Drive copies); move to Blob files if that grows.
+export async function makeThumb(file: Blob): Promise<string | undefined> {
+  try {
+    const src = URL.createObjectURL(file);
+    let el: CanvasImageSource, w: number, h: number;
+    if (file.type.startsWith("video")) {
+      const v = Object.assign(document.createElement("video"), { muted: true, preload: "auto", src });
+      await new Promise((ok, fail) => { v.onloadedmetadata = ok; v.onerror = fail; });
+      v.currentTime = Math.min(1, v.duration / 2 || 0);
+      await new Promise((ok) => (v.onseeked = ok));
+      [el, w, h] = [v, v.videoWidth, v.videoHeight];
+    } else {
+      const b = await createImageBitmap(file);
+      [el, w, h] = [b, b.width, b.height];
+    }
+    const k = 240 / w;
+    const c = Object.assign(document.createElement("canvas"), { width: 240, height: Math.round(h * k) });
+    c.getContext("2d")!.drawImage(el, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(src);
+    return c.toDataURL("image/jpeg", 0.6);
+  } catch { return undefined; }
+}
+
 export async function uploadFile(f: File | Blob, name = (f as File).name ?? "file"): Promise<string> {
   const d = await fetch("/api/upload", { method: "POST", body: JSON.stringify({ name, type: f.type, size: f.size }) }).then((r) => r.json());
   if (d.error) throw new Error(d.error);
