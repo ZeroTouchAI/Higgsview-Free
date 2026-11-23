@@ -10,6 +10,7 @@ type Google = {
       renderButton: (el: HTMLElement, o: Record<string, string | number>) => void;
     };
     oauth2: {
+      revoke: (token: string, done?: () => void) => void;
       initTokenClient: (o: { client_id: string; scope: string; callback: (r: TokenResponse) => void; error_callback?: (e: { message?: string }) => void }) => { requestAccessToken: (o?: { prompt?: string }) => void };
     };
   };
@@ -58,6 +59,18 @@ export async function driveToken(): Promise<string> {
       error_callback: (e) => fail(new Error(e.message ?? "Google Drive access was cancelled")),
     }).requestAccessToken({ prompt: "" });
   });
+}
+
+// Disconnect: forget the token, switch auto-save off, and ask Google to revoke this browser's permission.
+export async function disconnectDrive(): Promise<void> {
+  const t = drive?.token;
+  setDrive(undefined);
+  setAutoSave(false);
+  if (!t) return;
+  try {
+    const g = await loadGoogle();
+    await new Promise<void>((ok) => { g.accounts.oauth2.revoke(t, () => ok()); setTimeout(ok, 3000); });
+  } catch {}
 }
 
 // Where Drive exports go: a folder the user picked (remembered in this browser), else My Drive/Higgsview.

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { refreshHistory, unavailable, useHistory, type Item } from "@/lib/history";
-import { GOOGLE_CLIENT_ID, autoSave, driveConnected, driveMinutesLeft, driveToken, onDriveChange, saveToDrive, setAutoSave } from "@/lib/google";
+import { GOOGLE_CLIENT_ID, autoSave, driveConnected, driveMinutesLeft, disconnectDrive, driveToken, onDriveChange, saveToDrive, setAutoSave } from "@/lib/google";
 import { KIE_KEEP_DAYS } from "@/lib/history";
 import { ask, tell } from "@/components/Dialog";
 import { kieBlob } from "@/lib/kieFile";
@@ -80,13 +80,18 @@ export function DriveConnection() {
   const { connected, minutes, auto } = useDrive();
   const [err, setErr] = useState("");
   const connect = () => driveToken().then(() => setErr(""), (e) => setErr(e.message));
+  const disconnect = () => disconnectDrive().then(() => setErr(""));
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-white/[.04] p-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className={`size-2.5 rounded-full ${connected ? "bg-lime" : "bg-amber-400"}`} />
         <span className="font-semibold">{connected ? "Connected" : "Not connected"}</span>
         <span className="text-xs text-muted">{connected ? `Google's permission lasts about ${minutes} more min` : "Connect to save to Drive (Google asks again about every hour)."}</span>
-        <button onClick={connect} className="ml-auto rounded-xl px-3 py-1.5 text-sm font-semibold text-white [background-image:radial-gradient(39.71%_136.54%_at_51.64%_117.31%,#22D3EE_0%,#1f3f99_100%)] hover:brightness-110">▲ {connected ? "Reconnect" : "Connect Google Drive"}</button>
+        {connected ? (
+          <button onClick={disconnect} className="ml-auto rounded-xl bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-500">✕ Disconnect</button>
+        ) : (
+          <button onClick={connect} className="ml-auto rounded-xl px-3 py-1.5 text-sm font-semibold text-white [background-image:radial-gradient(39.71%_136.54%_at_51.64%_117.31%,#22D3EE_0%,#1f3f99_100%)] hover:brightness-110">▲ Reconnect</button>
+        )}
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={!!auto.on} className="accent-lime"
