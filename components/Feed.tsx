@@ -265,7 +265,7 @@ function DriveButton({ item }: { item: Item }) {
     }
   }
   return (
-    <button onClick={exportIt} disabled={state === "busy"} title={err || `Save to your Google Drive → ${savedFolder()?.name ?? "My Drive › Higgsview"} (change the folder in your profile)`}
+    <button onClick={exportIt} disabled={state === "busy"} title={err || `Save to your Google Drive → ${savedFolder()?.name ?? "My Drive › Higgsview"} (you choose the folder when you connect Google Drive)`}
       className={`${ACTION} ${state === "error" ? "bg-red-500/20 text-red-300" : BLUE}`}>
       {state === "busy" ? "Saving…" : state === "error" ? "Retry Drive" : "▲ Google Drive"}
     </button>

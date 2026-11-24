@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { refreshHistory, unavailable, useHistory, type Item } from "@/lib/history";
-import { GOOGLE_CLIENT_ID, autoSave, driveConnected, driveMinutesLeft, disconnectDrive, driveToken, onDriveChange, saveToDrive, setAutoSave } from "@/lib/google";
+import { GOOGLE_CLIENT_ID, autoSave, connectDrive, driveConnected, driveMinutesLeft, disconnectDrive, onDriveChange, saveToDrive, setAutoSave } from "@/lib/google";
 import { KIE_KEEP_DAYS } from "@/lib/history";
 import { ask, tell } from "@/components/Dialog";
 import { kieBlob } from "@/lib/kieFile";
@@ -34,7 +34,7 @@ export async function askDriveSave(kind: string) {
   const keep = `It will be kept on Kie.ai for about ${KIE_KEEP_DAYS} days. Download it or save it to Google Drive before then: the card shows how many days are left.`;
   if (!yes) return tell(`Kept on Kie.ai for about ${KIE_KEEP_DAYS} days`, keep);
   try {
-    await driveToken();
+    await connectDrive();
     if (!a.on) setAutoSave(true);
   } catch (e) {
     await tell("Google Drive didn't connect", `${(e as Error).message}. ${keep}`);
@@ -79,14 +79,14 @@ export function DriveAutoSave() {
 export function DriveConnection() {
   const { connected, minutes, auto } = useDrive();
   const [err, setErr] = useState("");
-  const connect = () => driveToken().then(() => setErr(""), (e) => setErr(e.message));
+  const connect = () => connectDrive(true).then(() => setErr(""), (e) => setErr(e.message));
   const disconnect = () => disconnectDrive().then(() => setErr(""));
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-white/[.04] p-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className={`size-2.5 rounded-full ${connected ? "bg-lime" : "bg-amber-400"}`} />
         <span className="font-semibold">{connected ? "Connected" : "Not connected"}</span>
-        <span className="text-xs text-muted">{connected ? `Google's permission lasts about ${minutes} more min` : "Connect to save to Drive (Google asks again about every hour)."}</span>
+        <span className="text-xs text-muted">{connected ? `Google's permission lasts about ${minutes} more min` : "Connect, then pick the Drive folder your files go to (Google asks again about every hour)."}</span>
         {connected ? (
           <button onClick={disconnect} className="ml-auto rounded-xl bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-500">✕ Disconnect</button>
         ) : (

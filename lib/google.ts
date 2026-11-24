@@ -66,6 +66,7 @@ export async function disconnectDrive(): Promise<void> {
   const t = drive?.token;
   setDrive(undefined);
   setAutoSave(false);
+  setSavedFolder(undefined); // the next connect asks for a folder again
   if (!t) return;
   try {
     const g = await loadGoogle();
@@ -77,7 +78,7 @@ export async function disconnectDrive(): Promise<void> {
 export type DriveFolder = { id: string; name: string };
 const FOLDER = "hv_drive_folder";
 export const savedFolder = (): DriveFolder | undefined => { try { return JSON.parse(localStorage.getItem(FOLDER) ?? "null") ?? undefined; } catch { return undefined; } };
-export const setSavedFolder = (f?: DriveFolder) => { try { if (f) localStorage.setItem(FOLDER, JSON.stringify(f)); else localStorage.removeItem(FOLDER); } catch {} };
+export const setSavedFolder = (f?: DriveFolder) => { try { if (f) localStorage.setItem(FOLDER, JSON.stringify(f)); else localStorage.removeItem(FOLDER); } catch {} changed(); };
 export const folderLink = (id: string) => `https://drive.google.com/drive/folders/${id}`;
 // The default My Drive/Higgsview folder's id, remembered after the first save so Profile can link to it.
 const DEFAULT = "hv_drive_default";
@@ -115,6 +116,18 @@ export async function pickFolder(): Promise<DriveFolder | undefined> {
   });
 }
 
+// Connect = sign in to Google, then choose where files are saved (picking a folder also grants access to it under
+// drive.file). Disconnecting forgets the folder, so every fresh connect asks again. A silent refresh of a lapsed
+// token (force = false) keeps the remembered folder. Without the Picker key the old default folder is used.
+export async function connectDrive(force = false): Promise<void> {
+  await driveToken();
+  if (!canPickFolder || (!force && savedFolder())) return;
+  let f: DriveFolder | undefined;
+  try { f = await pickFolder(); } catch (e) { await disconnectDrive(); throw e; }
+  if (!f) { await disconnectDrive(); throw new Error("Choose a folder to finish connecting Google Drive"); }
+  setSavedFolder(f);
+}
+
 // Saves a result into the chosen folder (default My Drive/Higgsview); returns links to the file and its folder.
 // A dropped connection shouldn't fail a 30 MB save: each step gets up to 3 tries, and the error says which step broke.
 async function attempt<T>(what: string, fn: () => Promise<T>): Promise<T> {
@@ -136,6 +149,7 @@ export async function saveToDrive(file: string | Blob, name: string): Promise<{ 
   // Google answers 401 when the hour-long Drive permission has lapsed: forget it so the next click asks again.
   const check = (r: Response) => { if (r.status === 401) { setDrive(undefined); throw new Stop("Google Drive access expired. Press the button again to reconnect."); } return r; };
   let target = savedFolder();
+  if (!target && canPickFolder) throw new Stop("Choose a Drive folder first: disconnect and reconnect Google Drive in your Profile.");
   if (!target) {
     const id = await attempt("Couldn't reach Google Drive", async () => {
       const q = encodeURIComponent("name='Higgsview' and mimeType='application/vnd.google-apps.folder' and trashed=false");
@@ -156,7 +170,7 @@ export async function saveToDrive(file: string | Blob, name: string): Promise<{ 
     }));
     const session = start.headers.get("Location");
     if (!session) {
-      if (savedFolder()) { setSavedFolder(undefined); throw new Stop("Couldn't save to your chosen folder (deleted?). Try again to use My Drive › Higgsview."); }
+      if (savedFolder()) { setSavedFolder(undefined); throw new Stop("Couldn't save to your chosen folder (deleted?). Disconnect and reconnect Google Drive to choose a folder again."); }
       throw new Stop(`Google Drive refused the upload (${start.status}).`);
     }
     const done = await fetch(session, { method: "PUT", body: blob }).then(check).then((r) => r.json());
