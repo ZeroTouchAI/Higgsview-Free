@@ -83,6 +83,7 @@ Commands: `npm run dev`, `npm run check` (sanity check of models and apps), `npm
 - **[Effortless Social Media](https://effortlesssocialmedia.zerotouchai.com?utm_source=higgsview&utm_medium=referral)**: social media content on autopilot.
 - **[Effortless Cold Calling](https://effortlesscoldcalling.zerotouchai.com?utm_source=higgsview&utm_medium=referral)**: you choose the niche; AI agents call and qualify leads.
 - **[Effortless UGC](https://effortlessugc.netlify.app?utm_source=higgsview&utm_medium=referral)**: one product photo and your website in, an on-brand UGC-style ad photo out.
+- **[ManyReply](https://manyreply-free-docs.vercel.app?utm_source=higgsview&utm_medium=referral)**: free and open source. Pick a keyword; anyone who comments it on your Instagram post gets your link by DM, with a follow-first gate, link tracking, a DM inbox and analytics. Your Zernio key stays in your browser.
 
 ## License
 
